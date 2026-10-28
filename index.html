@@ -112,8 +112,9 @@ async function lib(){
  const how=`<h3>Cara mengambil buku</h3><ol class="note" style="padding-left:20px;line-height:1.7">
  <li>Buka <a href="https://www.gutenberg.org" target="_blank" rel="noopener" style="color:var(--ac)">https://www.gutenberg.org</a>, cari judul buku di kotak pencarian, lalu buka halaman bukunya.</li>
  <li>Cari <b>Plain Text UTF-8</b>. Di HP: tekan lama link-nya, pilih <b>Download link</b>. Di komputer: klik kanan, pilih <b>Save link as</b>.</li>
- <li>Ganti nama file jadi singkat tanpa spasi, tetap berakhiran .txt, misalnya <b>alice.txt</b>.</li></ol>
- `;
+ <li>Pilih file yang sudah diunduh di bawah ini, atau tempel isinya (di halaman teks: tekan lama → Pilih semua → Salin).</li></ol>
+ <input type="file" id="gfile" accept=".txt,text/plain">
+ <textarea id="gpaste" rows="3" placeholder="Atau tempel teks buku di sini" style="width:100%;margin-top:12px;font:inherit;background:var(--card);color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:8px"></textarea><div class="row" style="margin-top:10px"><button class="btn" id="gpb">Simpan sebagai buku</button></div>`;
 app.innerHTML='<h1>Buku</h1><p class="sub">Ketuk kata apa pun saat membaca untuk melihat artinya.</p>'+
  (files.length?files.map(f=>{const b=S.books[f]||{},p=b.page||1;return `<button class="card" data-open="${qa(f)}"><b>${esc(b.t||pretty(f))}</b>${b.n?`<div class="bar"><i style="width:${Math.round((p-1)/b.n*100)}%"></i></div><div class="meta">${p>1?'Lanjut dari halaman '+p+' dari '+b.n:'Belum dibaca · '+b.n+' halaman'}</div>`:'<div class="meta">Ketuk untuk mulai membaca</div>'}</button>${isLocal(f)?`<button class="ghost" style="margin:-4px 0 12px" data-del="${qa(f)}">Hapus buku ini</button>`:''}`}).join(''):'<p class="note">Belum ada buku. Tambahkan lewat cara di bawah.</p>')+how}
 function tok(s){return s.replace(/([\p{L}’']+)|([^\p{L}’']+)/gu,(m,w,o)=>w?`<span class="w${S.saved[norm(w)]?' sv':''}" data-w="${esc(w)}">${esc(w)}</span>`:esc(o))}
