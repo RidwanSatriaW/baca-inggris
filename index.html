@@ -56,8 +56,7 @@ h3{margin:26px 0 8px;font-size:1rem}
 <nav><button data-v="lib">Buku</button><button data-v="words">Kata saya</button><button data-v="rem">Pengingat</button></nav>
 <script>
 const LIM=1100;
-const SUG=[['11','Alice in Wonderland'],['55','The Wizard of Oz'],['16','Peter Pan'],['1597','Andersen’s Fairy Tales'],['2591','Grimms’ Fairy Tales'],['236','The Jungle Book']];
-let S={books:{},saved:{},cache:{},rem:{on:false,time:'07:00',last:''}},mem={},pages={};
+let S={books:{},list:[],saved:{},cache:{},rem:{on:false,time:'07:00',last:''}},mem={},pages={};
 try{const r=localStorage.getItem('baca-gutenberg');if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
 function save(){try{localStorage.setItem('baca-gutenberg',JSON.stringify(S))}catch(e){}}
 const $=s=>document.querySelector(s),app=$('#app'),sheet=$('#sheet');
@@ -80,21 +79,22 @@ function paginate(text){const ps=text.split(/\n\s*\n/).map(p=>p.replace(/\s*\n\s
   if(p.length>LIM){let b=c&&c.length<300?c+'\n\n':(flush(),'');c='';for(const s of p.match(/[^.!?]+[.!?”"’']*\s*/g)||[p]){if(b.length+s.length>LIM&&b){out.push(b.trim());b=''}b+=s}if(b.trim())out.push(b.trim());continue}
   if(c&&c.length+p.length>LIM)flush();c+=(c?'\n\n':'')+p}
  flush();return out}
-function getText(id){if(mem[id])return mem[id];try{return localStorage.getItem('bt-'+id)}catch(e){return null}}
-function getPages(id){if(pages[id])return pages[id];const t=getText(id);if(!t)return null;return pages[id]=paginate(t)}
-function addBook(id,raw,fallbackTitle){const c=clean(raw);if(c.text.length<500)throw new Error('teks terlalu pendek');
+const qa=x=>esc(x).replace(/"/g,'&quot;'),pretty=f=>f.replace(/\.txt$/i,'').replace(/[_-]+/g,' ');
+async function listBooks(){let l=[];
+ try{const r=await fetch('buku/daftar.json',{cache:'no-store'});if(r.ok){const j=await r.json();if(Array.isArray(j))l=j.filter(x=>typeof x==='string')}}catch(e){}
+ if(!l.length){try{const h=location.hostname,m=h.match(/^([^.]+)\.github\.io$/);if(m){const sg=location.pathname.split('/')[1],repo=sg&&sg!=='index.html'?sg:h;const r=await fetch(`https://api.github.com/repos/${m[1]}/${repo}/contents/buku`);if(r.ok){const j=await r.json();l=j.filter(x=>x.type==='file'&&/\.txt$/i.test(x.name)).map(x=>x.name)}}}catch(e){}}
+ if(l.length){S.list=l;save()}else l=S.list||[];return l}
+const isLocal=f=>f.startsWith('u:');
+async function getPages(f){if(pages[f])return pages[f];let raw;
+ if(isLocal(f)){raw=mem[f];if(!raw){try{raw=localStorage.getItem('bt-'+f)}catch(e){}}if(!raw)throw 0}
+ else{const r=await fetch('buku/'+encodeURIComponent(f));if(!r.ok)throw 0;raw=await r.text()}
+ const c=clean(raw);if(c.text.length<500)throw 0;
+ pages[f]=paginate(c.text);const old=S.books[f]||{};S.books[f]={t:c.title||old.t||pretty(f),page:old.page||1,n:pages[f].length};save();return pages[f]}
+function addBook(raw,fallback){const c=clean(raw);if(c.text.length<500)throw new Error('pendek');
+ const id='u:'+[...c.text.slice(0,300)].reduce((h,ch)=>(h*31+ch.charCodeAt(0))>>>0,7);
  mem[id]=c.text;try{localStorage.setItem('bt-'+id,c.text)}catch(e){toast('Penyimpanan HP penuh, buku ini hanya terbuka selama halaman tidak ditutup.')}
- pages[id]=paginate(c.text);const old=S.books[id]||{};S.books[id]={t:c.title||fallbackTitle||'Buku '+id,page:old.page||1,n:pages[id].length};save();return id}
-
-/* ---------- ambil dari Project Gutenberg ---------- */
-async function getUrl(u){const c=new AbortController(),h=setTimeout(()=>c.abort(),25000);try{const r=await fetch(u,{signal:c.signal});if(!r.ok)throw 0;return await r.text()}finally{clearTimeout(h)}}
-async function fromGutenberg(id){const u=`https://www.gutenberg.org/cache/epub/${id}/pg${id}.txt`;
- for(const url of [u,'https://api.allorigins.win/raw?url='+encodeURIComponent(u)]){try{const t=await getUrl(url);if(t&&t.length>500)return t}catch(e){}}
- throw new Error('gagal')}
-async function loadId(id){id=String(id).trim();if(!/^\d+$/.test(id))return toast('Masukkan nomor buku berupa angka.');
- toast('Mengunduh buku…');try{addBook(id,await fromGutenberg(id));toast('Buku siap dibaca.');show('lib')}
- catch(e){toast('Tidak bisa mengunduh. Unduh file .txt dari gutenberg.org lalu pilih lewat tombol "Buka file .txt".')}}
-async function loadFile(f){if(!f)return;try{const id='f'+[...f.name].reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,7);addBook(id,await f.text(),f.name.replace(/\.txt$/i,''));toast('Buku siap dibaca.');show('lib')}catch(e){toast('File tidak bisa dibaca sebagai buku.')}}
+ pages[id]=paginate(c.text);const old=S.books[id]||{};S.books[id]={t:c.title||fallback||'Buku saya',page:old.page||1,n:pages[id].length};save()}
+async function loadFile(f){if(!f)return;try{addBook(await f.text(),f.name.replace(/\.txt$/i,''));toast('Buku siap dibaca.');show('lib')}catch(e){toast('File tidak bisa dibaca sebagai buku.')}}
 
 /* ---------- terjemahan ---------- */
 async function mm(q){let r;try{r=await fetch('https://api.mymemory.translated.net/get?q='+encodeURIComponent(q)+'&langpair=en|id'+(S.email?'&de='+encodeURIComponent(S.email):''))}catch(e){throw new Error('net')}
@@ -106,15 +106,23 @@ const errMsg=e=>e&&e.message==='quota'?'Batas harian terjemahan gratis sudah hab
 function show(v){closeSheet();view=v;window.scrollTo(0,0);
  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('cur',b.dataset.v===(v==='read'?'lib':v)));
  ({lib:lib,read:read,words:words,rem:rem})[v]()}
-function lib(){const ids=Object.keys(S.books);
- app.innerHTML=`<h1>Buku</h1><p class="sub">Ketuk kata apa pun saat membaca untuk melihat artinya.</p>`+
- (ids.length?ids.map(id=>{const b=S.books[id],p=b.page||1;return `<div class="item" style="display:block"><button class="card" style="border:0;padding:0;margin:0" data-open="${id}"><b>${esc(b.t)}</b><div class="bar"><i style="width:${Math.round((p-1)/b.n*100)}%"></i></div><div class="meta">${p>1?'Lanjut dari halaman '+p+' dari '+b.n:'Belum dibaca · '+b.n+' halaman'}</div></button><button class="ghost" style="margin-top:10px" data-del="${id}">Hapus buku</button></div>`}).join(''):'<p class="note">Belum ada buku. Tambahkan dari Project Gutenberg di bawah.</p>')+
- `<h3>Tambah buku dari Project Gutenberg</h3><div class="row"><input type="text" id="gid" inputmode="numeric" placeholder="Nomor buku, mis. 11"><button class="btn" id="gadd">Unduh</button></div>
- <p class="note">Pilihan cepat:</p><div class="row">${SUG.map(s=>`<button class="chip" data-g="${s[0]}">${s[1]}</button>`).join('')}</div>
- <h3>Atau buka file .txt</h3><p class="note">Unduh buku format "Plain Text UTF-8" dari gutenberg.org, lalu pilih di sini.</p><input type="file" id="gfile" accept=".txt,text/plain"><h3>Atau tempel teks buku</h3><p class="note">Di halaman teks tadi: tekan lama → Pilih semua → Salin, lalu tempel di sini.</p><textarea id="gpaste" rows="4" style="width:100%;font:inherit;background:var(--card);color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:8px"></textarea><div class="row" style="margin-top:10px"><button class="btn" id="gpb">Simpan sebagai buku</button></div>`}
+async function lib(){
+ app.innerHTML='<h1>Buku</h1><p class="sub">Ketuk kata apa pun saat membaca untuk melihat artinya.</p><p class="note">Memuat daftar buku…</p>';
+ const files=(await listBooks()).concat(Object.keys(S.books).filter(isLocal));if(view!=='lib')return;
+ const how=`<h3>Cara mengambil buku</h3><ol class="note" style="padding-left:20px;line-height:1.7">
+ <li>Buka <a href="https://www.gutenberg.org" target="_blank" rel="noopener" style="color:var(--ac)">https://www.gutenberg.org</a>, cari judul buku di kotak pencarian, lalu buka halaman bukunya.</li>
+ <li>Cari <b>Plain Text UTF-8</b>. Di HP: tekan lama link-nya, pilih <b>Download link</b>. Di komputer: klik kanan, pilih <b>Save link as</b>.</li>
+ <li>Ganti nama file jadi singkat tanpa spasi, tetap berakhiran .txt, misalnya <b>alice.txt</b>.</li></ol>
+ <h3>Cara 1: masukkan ke HP ini saja</h3><p class="note">Tidak perlu GitHub. Buku hanya tersimpan di HP ini.</p><input type="file" id="gfile" accept=".txt,text/plain">
+ <p class="note" style="margin-top:14px">Atau tempel teksnya (di halaman teks: tekan lama → Pilih semua → Salin):</p><textarea id="gpaste" rows="3" style="width:100%;font:inherit;background:var(--card);color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:8px"></textarea><div class="row" style="margin-top:10px"><button class="btn" id="gpb">Simpan sebagai buku</button></div>
+ <h3>Cara 2: tambahkan untuk semua orang (lewat GitHub)</h3><p class="note">Buka repository GitHub-mu. Masuk ke folder <b>buku</b>, pilih <b>Add file → Upload files</b>, pilih file .txt tadi, lalu <b>Commit changes</b>. Kalau folder buku belum ada: <b>Add file → Create new file</b>, ketik nama <b>buku/daftar.json</b>, isi dengan <b>[]</b>, lalu Commit. Tunggu 1 sampai 2 menit, lalu buka ulang aplikasi.</p>`;
+app.innerHTML='<h1>Buku</h1><p class="sub">Ketuk kata apa pun saat membaca untuk melihat artinya.</p>'+
+ (files.length?files.map(f=>{const b=S.books[f]||{},p=b.page||1;return `<button class="card" data-open="${qa(f)}"><b>${esc(b.t||pretty(f))}</b>${b.n?`<div class="bar"><i style="width:${Math.round((p-1)/b.n*100)}%"></i></div><div class="meta">${p>1?'Lanjut dari halaman '+p+' dari '+b.n:'Belum dibaca · '+b.n+' halaman'}</div>`:'<div class="meta">Ketuk untuk mulai membaca</div>'}</button>${isLocal(f)?`<button class="ghost" style="margin:-4px 0 12px" data-del="${qa(f)}">Hapus buku ini</button>`:''}`}).join(''):'<p class="note">Belum ada buku. Tambahkan lewat cara di bawah.</p>')+how}
 function tok(s){return s.replace(/([\p{L}’']+)|([^\p{L}’']+)/gu,(m,w,o)=>w?`<span class="w${S.saved[norm(w)]?' sv':''}" data-w="${esc(w)}">${esc(w)}</span>`:esc(o))}
-function read(){const b=S.books[cur],pg=getPages(cur);if(!pg){toast('Teks buku tidak ditemukan. Tambahkan lagi bukunya.');return show('lib')}
- const n=pg.length,p=Math.min(Math.max(b.page||1,1),n);b.page=p;b.n=n;save();
+async function read(){const f=cur;let pg=pages[f];
+ if(!pg){app.innerHTML='<p class="note">Memuat buku…</p>';try{pg=await getPages(f)}catch(e){toast('Buku tidak bisa dimuat. Pastikan file .txt ada di folder buku.');return show('lib')}}
+ if(view!=='read'||cur!==f)return;
+ const b=S.books[f],n=pg.length,p=Math.min(Math.max(b.page||1,1),n);b.page=p;b.n=n;save();
  app.innerHTML=`<div class="top"><button class="ghost" id="back">Kembali</button><span class="meta">Halaman ${p} dari ${n}</span></div><h1>${esc(b.t)}</h1><div class="bar" style="margin-bottom:20px"><i style="width:${Math.round(p/n*100)}%"></i></div><div class="read">${pg[p-1].split('\n\n').map(x=>`<p>${tok(x)}</p>`).join('')}</div>
  <div class="row" style="justify-content:space-between;margin-top:24px"><button class="ghost" data-go="-1" ${p===1?'disabled':''}>Sebelumnya</button><button class="btn" data-go="1" ${p===n?'disabled':''}>Berikutnya</button></div>
  <div class="row" style="margin-top:18px"><span class="note">Lompat ke halaman</span><input type="number" id="jp" min="1" max="${n}" value="${p}"><button class="ghost" id="jg">Pergi</button></div>`;window.scrollTo(0,0)}
@@ -140,11 +148,9 @@ setInterval(()=>{const r=S.rem;if(!r.on)return;const d=new Date(),hm=String(d.ge
 document.addEventListener('click',e=>{const t=e.target;
  if(t.dataset.v)return show(t.dataset.v);
  const o=t.closest('[data-open]');if(o){cur=o.dataset.open;return show('read')}
- if(t.dataset.del){const id=t.dataset.del;if(confirm('Hapus buku ini dari HP?')){delete S.books[id];delete pages[id];delete mem[id];try{localStorage.removeItem('bt-'+id)}catch(x){}save();lib()}return}
  if(t.id==='back')return show('lib');
- if(t.id==='gpb'){const v=$('#gpaste').value;if(v.length<500)return toast('Tempelkan teks bukunya dulu.');try{const id='p'+[...v.slice(0,300)].reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,7);addBook(id,v,'Buku tempel');toast('Buku siap dibaca.');show('lib')}catch(x){toast('Teks tidak bisa dibaca sebagai buku.')}return}
- if(t.id==='gadd')return loadId($('#gid').value);
- if(t.dataset.g)return loadId(t.dataset.g);
+ if(t.dataset.del){const id=t.dataset.del;if(confirm('Hapus buku ini dari HP?')){delete S.books[id];delete pages[id];delete mem[id];try{localStorage.removeItem('bt-'+id)}catch(x){}save();lib()}return}
+ if(t.id==='gpb'){const v=$('#gpaste').value;if(v.length<500)return toast('Tempelkan teks bukunya dulu.');try{addBook(v,'Buku tempel');toast('Buku siap dibaca.');show('lib')}catch(x){toast('Teks tidak bisa dibaca sebagai buku.')}return}
  if(t.dataset.go){const b=S.books[cur];b.page=(b.page||1)+ +t.dataset.go;save();return read()}
  if(t.id==='jg'){const b=S.books[cur],v=parseInt($('#jp').value,10);if(v>=1&&v<=b.n){b.page=v;save();read()}else toast('Halaman 1 sampai '+b.n);return}
  if(t.classList.contains('w'))return open(t.dataset.w,t);
