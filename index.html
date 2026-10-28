@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<title>Baca Inggris</title>
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f4f6f9;--card:#fff;--tx:#1b2538;--mu:#66728a;--ac:#0f766e;--ac-tx:#fff;--hl:#f6c344;--hl-tx:#1b2538;--ln:#dde3ec;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#0f141c;--card:#18202c;--tx:#e6ebf3;--mu:#92a0b8;--ac:#5eead4;--ac-tx:#0f141c;--ln:#2a3445}}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 system-ui,sans-serif}
+main{max-width:640px;margin:0 auto;padding:20px 18px 96px}
+h1{font:600 1.6rem/1.2 Literata,Georgia,serif;margin:8px 0 4px}
+.sub{color:var(--mu);margin:0 0 18px}
+.card{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:14px 16px;margin-bottom:12px;color:inherit;font:inherit;cursor:pointer}
+.card b{font:600 1.1rem Literata,Georgia,serif;display:block}
+.bar{height:6px;background:var(--ln);border-radius:3px;margin-top:10px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ac)}
+.meta{color:var(--mu);font-size:.88rem;margin-top:6px}
+.read{font:1.2rem/1.9 Literata,Georgia,serif}
+.read p{margin:0 0 1.1em}
+.w{cursor:pointer;border-radius:4px;padding:0 1px}
+.w:hover{background:var(--ln)}
+.w.on{background:var(--hl);color:var(--hl-tx)}
+.w.sv{text-decoration:underline dotted var(--ac);text-underline-offset:4px}
+.top{position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;z-index:5;border-bottom:1px solid var(--ln);margin-bottom:16px}
+button{font:inherit;color:inherit}
+.btn{background:var(--ac);color:var(--ac-tx);border:0;border-radius:8px;padding:9px 16px;cursor:pointer;font-weight:600}
+.ghost{background:none;border:1px solid var(--ln);border-radius:8px;padding:8px 14px;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+nav{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--ln);padding-bottom:env(safe-area-inset-bottom,0px);z-index:8}
+nav button{flex:1;background:none;border:0;padding:14px 4px;cursor:pointer;color:var(--mu)}
+nav button.cur{color:var(--ac);font-weight:600}
+#sheet{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--ln);border-radius:16px 16px 0 0;padding:18px 20px calc(18px + env(safe-area-inset-bottom,0px));transform:translateY(110%);transition:transform .2s;z-index:10;max-width:640px;margin:0 auto;box-shadow:0 -8px 30px rgba(0,0,0,.18);max-height:70vh;overflow:auto}
+#sheet.open{transform:none}
+#sheet h2{font:600 1.5rem Literata,Georgia,serif;margin:0}
+#sheet .tr{font-size:1.2rem;margin:6px 0 14px}
+#sx{margin-top:14px;padding-top:12px;border-top:1px solid var(--ln);font-size:.98rem}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.item{display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--card);border:1px solid var(--ln);border-radius:10px;padding:10px 14px;margin-bottom:10px}
+label{display:flex;align-items:center;gap:10px;margin:14px 0}
+input[type=time],input[type=number],input[type=text]{font:inherit;background:var(--card);color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:8px}
+input[type=number]{width:84px}
+.chip{background:var(--card);border:1px solid var(--ln);border-radius:20px;padding:6px 12px;cursor:pointer;font-size:.9rem}
+.note{color:var(--mu);font-size:.9rem}
+h3{margin:26px 0 8px;font-size:1rem}
+#toast{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:20;display:none;max-width:90%}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<main id="app"></main>
+<div id="sheet" role="dialog" aria-live="polite"></div>
+<nav><button data-v="lib">Buku</button><button data-v="words">Kata saya</button><button data-v="rem">Pengingat</button></nav>
+<script>
+const LIM=1100;
+const SUG=[['11','Alice in Wonderland'],['55','The Wizard of Oz'],['16','Peter Pan'],['1597','Andersen’s Fairy Tales'],['2591','Grimms’ Fairy Tales'],['236','The Jungle Book']];
+let S={books:{},saved:{},cache:{},rem:{on:false,time:'07:00',last:''}},mem={},pages={};
+try{const r=localStorage.getItem('baca-gutenberg');if(r)S=Object.assign(S,JSON.parse(r))}catch(e){}
+function save(){try{localStorage.setItem('baca-gutenberg',JSON.stringify(S))}catch(e){}}
+const $=s=>document.querySelector(s),app=$('#app'),sheet=$('#sheet');
+const norm=w=>w.toLowerCase().replace(/’/g,"'").replace(/^'+|'+$/g,'');
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+let view='lib',cur=null;
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.h);toast.h=setTimeout(()=>t.style.display='none',5000)}
+function speak(w){try{const u=new SpeechSynthesisUtterance(w);u.lang='en-US';u.rate=.85;speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}}
+function closeSheet(){sheet.classList.remove('open');document.querySelectorAll('.w.on').forEach(x=>x.classList.remove('on'))}
+
+/* ---------- buku: bersihkan & bagi halaman ---------- */
+function clean(raw){let t=raw.replace(/\r\n?/g,'\n'),title=(t.match(/^Title:\s*(.+)$/m)||[])[1]||'';
+ const a=t.search(/\*\*\* ?START OF (THE|THIS) PROJECT GUTENBERG EBOOK[^\n]*\n/i);
+ if(a>=0)t=t.slice(a).replace(/^[^\n]*\n/,'');
+ const z=t.search(/\*\*\* ?END OF (THE|THIS) PROJECT GUTENBERG EBOOK/i);if(z>=0)t=t.slice(0,z);
+ return{title:title.trim(),text:t.replace(/_/g,'').trim()}}
+function paginate(text){const ps=text.split(/\n\s*\n/).map(p=>p.replace(/\s*\n\s*/g,' ').trim()).filter(Boolean),out=[];let c='';
+ const flush=()=>{if(c){out.push(c);c=''}};
+ for(const p of ps){
+  if(p.length>LIM){let b=c&&c.length<300?c+'\n\n':(flush(),'');c='';for(const s of p.match(/[^.!?]+[.!?”"’']*\s*/g)||[p]){if(b.length+s.length>LIM&&b){out.push(b.trim());b=''}b+=s}if(b.trim())out.push(b.trim());continue}
+  if(c&&c.length+p.length>LIM)flush();c+=(c?'\n\n':'')+p}
+ flush();return out}
+function getText(id){if(mem[id])return mem[id];try{return localStorage.getItem('bt-'+id)}catch(e){return null}}
+function getPages(id){if(pages[id])return pages[id];const t=getText(id);if(!t)return null;return pages[id]=paginate(t)}
+function addBook(id,raw,fallbackTitle){const c=clean(raw);if(c.text.length<500)throw new Error('teks terlalu pendek');
+ mem[id]=c.text;try{localStorage.setItem('bt-'+id,c.text)}catch(e){toast('Penyimpanan HP penuh, buku ini hanya terbuka selama halaman tidak ditutup.')}
+ pages[id]=paginate(c.text);const old=S.books[id]||{};S.books[id]={t:c.title||fallbackTitle||'Buku '+id,page:old.page||1,n:pages[id].length};save();return id}
+
+/* ---------- ambil dari Project Gutenberg ---------- */
+async function getUrl(u){const c=new AbortController(),h=setTimeout(()=>c.abort(),25000);try{const r=await fetch(u,{signal:c.signal});if(!r.ok)throw 0;return await r.text()}finally{clearTimeout(h)}}
+async function fromGutenberg(id){const u=`https://www.gutenberg.org/cache/epub/${id}/pg${id}.txt`;
+ for(const url of [u,'https://api.allorigins.win/raw?url='+encodeURIComponent(u)]){try{const t=await getUrl(url);if(t&&t.length>500)return t}catch(e){}}
+ throw new Error('gagal')}
+async function loadId(id){id=String(id).trim();if(!/^\d+$/.test(id))return toast('Masukkan nomor buku berupa angka.');
+ toast('Mengunduh buku…');try{addBook(id,await fromGutenberg(id));toast('Buku siap dibaca.');show('lib')}
+ catch(e){toast('Tidak bisa mengunduh. Unduh file .txt dari gutenberg.org lalu pilih lewat tombol "Buka file .txt".')}}
+async function loadFile(f){if(!f)return;try{const id='f'+[...f.name].reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,7);addBook(id,await f.text(),f.name.replace(/\.txt$/i,''));toast('Buku siap dibaca.');show('lib')}catch(e){toast('File tidak bisa dibaca sebagai buku.')}}
+
+/* ---------- terjemahan ---------- */
+async function mm(q){let r;try{r=await fetch('https://api.mymemory.translated.net/get?q='+encodeURIComponent(q)+'&langpair=en|id'+(S.email?'&de='+encodeURIComponent(S.email):''))}catch(e){throw new Error('net')}
+ const j=await r.json().catch(()=>({})),t=j.responseData&&j.responseData.translatedText;
+ if(!t||/MYMEMORY WARNING/i.test(t)||(j.responseStatus&&+j.responseStatus!==200))throw new Error(/MYMEMORY WARNING/i.test(t||'')||+j.responseStatus===429?'quota':'net');return t}
+const errMsg=e=>e&&e.message==='quota'?'Batas harian terjemahan gratis sudah habis. Isi email di tab Pengingat untuk menaikkan batasnya 10 kali lipat, atau coba lagi besok.':'Tidak bisa terhubung ke layanan terjemahan. Cek internet, lalu coba lagi.';
+
+/* ---------- tampilan ---------- */
+function show(v){closeSheet();view=v;window.scrollTo(0,0);
+ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('cur',b.dataset.v===(v==='read'?'lib':v)));
+ ({lib:lib,read:read,words:words,rem:rem})[v]()}
+function lib(){const ids=Object.keys(S.books);
+ app.innerHTML=`<h1>Buku</h1><p class="sub">Ketuk kata apa pun saat membaca untuk melihat artinya.</p>`+
+ (ids.length?ids.map(id=>{const b=S.books[id],p=b.page||1;return `<div class="item" style="display:block"><button class="card" style="border:0;padding:0;margin:0" data-open="${id}"><b>${esc(b.t)}</b><div class="bar"><i style="width:${Math.round((p-1)/b.n*100)}%"></i></div><div class="meta">${p>1?'Lanjut dari halaman '+p+' dari '+b.n:'Belum dibaca · '+b.n+' halaman'}</div></button><button class="ghost" style="margin-top:10px" data-del="${id}">Hapus buku</button></div>`}).join(''):'<p class="note">Belum ada buku. Tambahkan dari Project Gutenberg di bawah.</p>')+
+ `<h3>Tambah buku dari Project Gutenberg</h3><div class="row"><input type="text" id="gid" inputmode="numeric" placeholder="Nomor buku, mis. 11"><button class="btn" id="gadd">Unduh</button></div>
+ <p class="note">Pilihan cepat:</p><div class="row">${SUG.map(s=>`<button class="chip" data-g="${s[0]}">${s[1]}</button>`).join('')}</div>
+ <h3>Atau buka file .txt</h3><p class="note">Unduh buku format "Plain Text UTF-8" dari gutenberg.org, lalu pilih di sini.</p><input type="file" id="gfile" accept=".txt,text/plain"><h3>Atau tempel teks buku</h3><p class="note">Di halaman teks tadi: tekan lama → Pilih semua → Salin, lalu tempel di sini.</p><textarea id="gpaste" rows="4" style="width:100%;font:inherit;background:var(--card);color:var(--tx);border:1px solid var(--ln);border-radius:8px;padding:8px"></textarea><div class="row" style="margin-top:10px"><button class="btn" id="gpb">Simpan sebagai buku</button></div>`}
+function tok(s){return s.replace(/([\p{L}’']+)|([^\p{L}’']+)/gu,(m,w,o)=>w?`<span class="w${S.saved[norm(w)]?' sv':''}" data-w="${esc(w)}">${esc(w)}</span>`:esc(o))}
+function read(){const b=S.books[cur],pg=getPages(cur);if(!pg){toast('Teks buku tidak ditemukan. Tambahkan lagi bukunya.');return show('lib')}
+ const n=pg.length,p=Math.min(Math.max(b.page||1,1),n);b.page=p;b.n=n;save();
+ app.innerHTML=`<div class="top"><button class="ghost" id="back">Kembali</button><span class="meta">Halaman ${p} dari ${n}</span></div><h1>${esc(b.t)}</h1><div class="bar" style="margin-bottom:20px"><i style="width:${Math.round(p/n*100)}%"></i></div><div class="read">${pg[p-1].split('\n\n').map(x=>`<p>${tok(x)}</p>`).join('')}</div>
+ <div class="row" style="justify-content:space-between;margin-top:24px"><button class="ghost" data-go="-1" ${p===1?'disabled':''}>Sebelumnya</button><button class="btn" data-go="1" ${p===n?'disabled':''}>Berikutnya</button></div>
+ <div class="row" style="margin-top:18px"><span class="note">Lompat ke halaman</span><input type="number" id="jp" min="1" max="${n}" value="${p}"><button class="ghost" id="jg">Pergi</button></div>`;window.scrollTo(0,0)}
+function sentenceOf(el){const p=el.closest('p'),t=p.textContent;let pos=0;for(const c of p.childNodes){if(c===el)break;pos+=c.textContent.length}
+ let m,re=/[^.!?]+[.!?”"’']*\s*/g;while((m=re.exec(t))){if(pos>=m.index&&pos<m.index+m[0].length)return m[0].trim()}return t.slice(0,300)}
+function open(w,el){const k=norm(w);if(!k)return;let val=S.cache[k]||null;const sen=el?sentenceOf(el):'';
+ document.querySelectorAll('.w.on').forEach(x=>x.classList.remove('on'));if(el)el.classList.add('on');
+ sheet.innerHTML=`<h2>${esc(w)}</h2><div class="tr" id="trx">${val?esc(val):'<span class="note">Mencari terjemahan…</span>'}</div><div class="row"><button class="btn" id="spk">Ucapkan</button><button class="ghost" id="sv">${S.saved[k]?'Hapus dari Kata saya':'Simpan kata'}</button><button class="ghost" id="st">Arti kalimat</button><button class="ghost" id="cl">Tutup</button></div><div id="sx"></div>`;
+ sheet.classList.add('open');speak(w);
+ if(!val)mm(k).then(t=>{val=S.cache[k]=t;save();$('#trx').textContent=t}).catch(e=>{$('#trx').innerHTML='<span class="note">'+errMsg(e)+'</span>'});
+ $('#spk').onclick=()=>speak(w);$('#cl').onclick=closeSheet;
+ $('#st').onclick=()=>{const x=$('#sx');x.innerHTML='<span class="note">Menerjemahkan kalimat…</span>';mm(sen).then(t=>{x.innerHTML='<div class="note">'+esc(sen)+'</div><div style="margin-top:6px">'+esc(t)+'</div>'}).catch(e=>{x.innerHTML='<span class="note">'+errMsg(e)+'</span>'})};
+ $('#sv').onclick=()=>{if(S.saved[k])delete S.saved[k];else if(val)S.saved[k]=val;else return toast('Terjemahan belum tersedia');save();closeSheet();document.querySelectorAll('.w').forEach(x=>x.classList.toggle('sv',!!S.saved[norm(x.dataset.w)]))}}
+function words(){const ks=Object.keys(S.saved);
+ app.innerHTML='<h1>Kata saya</h1><p class="sub">Kata yang kamu simpan dari bacaan.</p>'+(ks.length?ks.map(k=>`<div class="item"><div><b>${esc(k)}</b><div class="note">${esc(S.saved[k])}</div></div><div class="row"><button class="ghost" data-sp="${esc(k)}">Ucapkan</button><button class="ghost" data-rm="${esc(k)}">Hapus</button></div></div>`).join(''):'<p class="note">Belum ada kata tersimpan. Ketuk kata di bacaan, lalu pilih Simpan kata.</p>')}
+function rem(){const r=S.rem;
+ app.innerHTML=`<h1>Pengingat</h1><p class="sub">Pengingat membaca setiap hari.</p><label><input type="checkbox" id="ron" ${r.on?'checked':''}> Aktifkan pengingat harian</label><label>Jam <input type="time" id="rt" value="${r.time}"></label><p class="note">Pengingat hanya berbunyi saat halaman ini sedang terbuka. Untuk notifikasi yang berbunyi walau aplikasi tertutup, perlu dibungkus menjadi APK.</p><h3>Terjemahan online</h3><p class="note">Gratis 5.000 karakter per hari. Isi emailmu (tanpa daftar, tanpa verifikasi) untuk naik menjadi 50.000 karakter per hari.</p><input type="text" id="em" inputmode="email" placeholder="email@contoh.com" value="${esc(S.email||'')}" style="width:100%">`;
+ $('#em').onchange=e=>{S.email=e.target.value.trim();save();toast(S.email?'Email tersimpan.':'Email dihapus.')};
+ $('#ron').onchange=async e=>{S.rem.on=e.target.checked;save();if(S.rem.on&&'Notification' in window&&Notification.permission==='default'){try{await Notification.requestPermission()}catch(x){}}};
+ $('#rt').onchange=e=>{S.rem.time=e.target.value;save()}}
+setInterval(()=>{const r=S.rem;if(!r.on)return;const d=new Date(),hm=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'),day=d.toDateString();
+ if(hm===r.time&&r.last!==day){r.last=day;save();const m='Waktunya membaca bahasa Inggris hari ini.';toast(m);try{if(Notification.permission==='granted')new Notification('Baca Inggris',{body:m})}catch(e){}}},20000);
+document.addEventListener('click',e=>{const t=e.target;
+ if(t.dataset.v)return show(t.dataset.v);
+ const o=t.closest('[data-open]');if(o){cur=o.dataset.open;return show('read')}
+ if(t.dataset.del){const id=t.dataset.del;if(confirm('Hapus buku ini dari HP?')){delete S.books[id];delete pages[id];delete mem[id];try{localStorage.removeItem('bt-'+id)}catch(x){}save();lib()}return}
+ if(t.id==='back')return show('lib');
+ if(t.id==='gpb'){const v=$('#gpaste').value;if(v.length<500)return toast('Tempelkan teks bukunya dulu.');try{const id='p'+[...v.slice(0,300)].reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,7);addBook(id,v,'Buku tempel');toast('Buku siap dibaca.');show('lib')}catch(x){toast('Teks tidak bisa dibaca sebagai buku.')}return}
+ if(t.id==='gadd')return loadId($('#gid').value);
+ if(t.dataset.g)return loadId(t.dataset.g);
+ if(t.dataset.go){const b=S.books[cur];b.page=(b.page||1)+ +t.dataset.go;save();return read()}
+ if(t.id==='jg'){const b=S.books[cur],v=parseInt($('#jp').value,10);if(v>=1&&v<=b.n){b.page=v;save();read()}else toast('Halaman 1 sampai '+b.n);return}
+ if(t.classList.contains('w'))return open(t.dataset.w,t);
+ if(t.dataset.sp)return speak(t.dataset.sp);
+ if(t.dataset.rm){delete S.saved[t.dataset.rm];save();words()}});
+document.addEventListener('change',e=>{if(e.target.id==='gfile')loadFile(e.target.files[0])});
+show('lib');
+</script>
+</body>
+</html>
